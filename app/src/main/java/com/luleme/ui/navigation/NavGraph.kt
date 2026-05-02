@@ -1,17 +1,22 @@
 package com.luleme.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -19,13 +24,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.luleme.domain.repository.UserSettingsRepository
 import com.luleme.ui.screens.home.HomeScreen
 import com.luleme.ui.screens.lock.LockScreen
 import com.luleme.ui.screens.settings.SettingsScreen
 import com.luleme.ui.screens.statistics.StatisticsScreen
 
 @Composable
-fun NavGraph(startDestination: String = Screen.Lock.route) {
+fun NavGraph(
+    userSettingsRepository: UserSettingsRepository
+) {
     val navController = rememberNavController()
 
     val items = listOf(
@@ -37,8 +45,8 @@ fun NavGraph(startDestination: String = Screen.Lock.route) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Show BottomBar only when not in Lock Screen
-    val showBottomBar = currentDestination?.route != Screen.Lock.route
+    val showBottomBar = currentDestination?.route != Screen.Lock.route &&
+            currentDestination?.route != Screen.LockCheck.route
 
     Scaffold(
         bottomBar = {
@@ -80,9 +88,20 @@ fun NavGraph(startDestination: String = Screen.Lock.route) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = startDestination,
+            startDestination = Screen.LockCheck.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.LockCheck.route) {
+                LockCheckScreen(
+                    userSettingsRepository = userSettingsRepository,
+                    onResult = { lockEnabled ->
+                        val destination = if (lockEnabled) Screen.Lock.route else Screen.Home.route
+                        navController.navigate(destination) {
+                            popUpTo(Screen.LockCheck.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable(Screen.Lock.route) {
                 LockScreen(
                     onUnlocked = {
@@ -96,5 +115,21 @@ fun NavGraph(startDestination: String = Screen.Lock.route) {
             composable(Screen.Statistics.route) { StatisticsScreen() }
             composable(Screen.Settings.route) { SettingsScreen() }
         }
+    }
+}
+
+@Composable
+private fun LockCheckScreen(
+    userSettingsRepository: UserSettingsRepository,
+    onResult: (lockEnabled: Boolean) -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+    }
+
+    LaunchedEffect(Unit) {
+        val settings = userSettingsRepository.getSettings()
+        val lockEnabled = settings?.lockEnabled == true && !settings.pinHash.isNullOrEmpty()
+        onResult(lockEnabled)
     }
 }

@@ -1,23 +1,25 @@
 package com.luleme.ui.screens.lock
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,15 +30,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luleme.ui.components.pin.NumPad
 import com.luleme.ui.components.pin.PinDots
-import com.luleme.ui.theme.CutePink
 import kotlinx.coroutines.delay
 
 @Composable
@@ -51,7 +51,6 @@ fun LockScreen(
     // Check PIN when input reaches 4 digits
     LaunchedEffect(pinInput) {
         if (pinInput.length == 4) {
-            // Small delay for UX
             delay(100)
             if (viewModel.verifyPin(pinInput)) {
                 onUnlocked()
@@ -64,20 +63,31 @@ fun LockScreen(
         }
     }
 
-    // Auto unlock if disabled (handled by ViewModel logic + this effect)
+    // Auto unlock if lock is disabled
     LaunchedEffect(isLoading) {
         if (!isLoading) {
-            // If verifyPin with empty string returns true, it means lock is disabled
             if (viewModel.verifyPin("")) {
                 onUnlocked()
             }
         }
     }
 
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        surfaceColor,
+                        surfaceColor
+                    )
+                )
+            )
+            .windowInsetsPadding(WindowInsets.systemBars)
     ) {
         if (isLoading) {
             CircularProgressIndicator(
@@ -85,49 +95,73 @@ fun LockScreen(
                 color = MaterialTheme.colorScheme.primary
             )
         } else {
-            // Only show content if we need to unlock (otherwise we navigated away)
-            // But we can render it anyway
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Lock,
-                    contentDescription = null,
-                    tint = CutePink,
-                    modifier = Modifier.size(48.dp)
-                )
+                Spacer(modifier = Modifier.height(80.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
-                
+                // Lock icon with circular background
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 Text(
                     text = "欢迎回来",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Text(
                     text = if (errorMessage.isNotEmpty()) errorMessage else "请输入密码解锁",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (errorMessage.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (errorMessage.isNotEmpty()) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
-                Spacer(modifier = Modifier.height(48.dp))
-                
-                PinDots(
-                    length = 4,
-                    inputLength = pinInput.length,
-                    modifier = Modifier.padding(bottom = 32.dp)
-                )
-                
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // PIN dots with rounded card background
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    color = surfaceVariantColor.copy(alpha = 0.5f),
+                    tonalElevation = 0.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        PinDots(
+                            length = 4,
+                            inputLength = pinInput.length
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.weight(1f))
-                
+
+                // NumPad
                 NumPad(
                     onNumberClick = { num ->
                         if (pinInput.length < 4) {
@@ -142,8 +176,8 @@ fun LockScreen(
                         }
                     }
                 )
-                
-                Spacer(modifier = Modifier.height(32.dp))
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
