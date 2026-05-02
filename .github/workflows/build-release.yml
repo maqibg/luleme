@@ -40,40 +40,53 @@ jobs:
           fileName: 'keystore.jks'
           encodedString: ${{ secrets.SIGNING_KEY_BASE64 }}
 
+      - name: Build Debug APK
+        run: gradle assembleDebug
+
       - name: Build Release APK
+        if: env.HAS_SIGNING_KEY == 'true'
         run: gradle assembleRelease
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           SIGNING_KEY_STORE_PATH: ${{ steps.decode_keystore.outputs.filePath }}
-      
+
       - name: Read Version
         id: version
         run: echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
-      
-      - name: Upload APK Artifact
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: Luleme-v${{ steps.version.outputs.VERSION }}
+          name: Luleme-v${{ steps.version.outputs.VERSION }}-debug
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Release APK
+        if: env.HAS_SIGNING_KEY == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Luleme-v${{ steps.version.outputs.VERSION }}-release
           path: app/build/outputs/apk/release/*.apk
-      
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
         with:
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: 撸了么 v${{ steps.version.outputs.VERSION }}
-          files: app/build/outputs/apk/release/*.apk
+          files: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
           draft: false
           prerelease: false
           body: |
-            ## 📦 版本更新 v${{ steps.version.outputs.VERSION }}
-            
+            ## 版本更新 v${{ steps.version.outputs.VERSION }}
+
             ### 安装说明
-            1. 下载下方的 APK 文件
+            1. 下载下方的 APK 文件（debug 版可直接安装）
             2. 在 Android 设备上安装
-            
+
             > **注意**: 请在卸载前导出重要数据以免丢失。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
