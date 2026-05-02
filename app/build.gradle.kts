@@ -46,9 +46,10 @@ android {
             val keyStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
             val keyAlias = System.getenv("SIGNING_KEY_ALIAS")
             val keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-            
+
             if (!keyStorePath.isNullOrEmpty() && !keyStorePassword.isNullOrEmpty()) {
-                storeFile = file(keyStorePath)
+                val ksFile = if (File(keyStorePath).isAbsolute) File(keyStorePath) else rootProject.file(keyStorePath)
+                storeFile = ksFile
                 storePassword = keyStorePassword
                 this.keyAlias = keyAlias
                 this.keyPassword = keyPassword
