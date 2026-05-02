@@ -58,6 +58,30 @@ class RecordRepositoryImpl @Inject constructor(
         dao.insertRecords(entities)
     }
 
+    override suspend fun addRecords(date: String, count: Int) {
+        val baseTime = System.currentTimeMillis()
+        val entities = (0 until count).map { index ->
+            RecordEntity(
+                timestamp = baseTime + index * 1000L,
+                date = date,
+                note = null
+            )
+        }
+        dao.insertRecords(entities)
+    }
+
+    override suspend fun deleteRecord(id: Long) {
+        dao.deleteRecordById(id)
+    }
+
+    override suspend fun deleteRecordsByDate(date: String) {
+        dao.deleteRecordsByDate(date)
+    }
+
+    override suspend fun getRecordsByDate(date: String): List<Record> {
+        return dao.getRecordsByDate(date).map { it.toDomain() }
+    }
+
     private fun RecordEntity.toDomain(): Record {
         val decryptedNote = this.note?.let { encryptionManager.decryptData(it) }
         return Record(

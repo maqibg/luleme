@@ -85,8 +85,50 @@ class HomeViewModel @Inject constructor(
                 recordRepository.addRecord()
                 loadData(showLoading = false)
             } catch (e: Exception) {
-                // Handle error
+                e.printStackTrace()
             }
+        }
+    }
+
+    suspend fun deleteRecord(id: Long): Boolean {
+        return try {
+            recordRepository.deleteRecord(id)
+            loadData(showLoading = false)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun backfillRecord(date: String, count: Int): Boolean {
+        return try {
+            recordRepository.addRecords(date, count)
+            try { loadData(showLoading = false) } catch (_: Exception) {}
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    suspend fun getRecordsByDate(date: String): List<Record> {
+        return try {
+            recordRepository.getRecordsByDate(date)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun deleteRecordsByDate(date: String): Boolean {
+        return try {
+            recordRepository.deleteRecordsByDate(date)
+            try { loadData(showLoading = false) } catch (_: Exception) {}
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
     }
 }

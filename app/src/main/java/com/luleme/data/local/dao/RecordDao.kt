@@ -21,4 +21,13 @@ interface RecordDao {
 
     @Query("SELECT * FROM records ORDER BY timestamp DESC")
     suspend fun getAllRecords(): List<RecordEntity>
+
+    @Query("DELETE FROM records WHERE id = :id")
+    suspend fun deleteRecordById(id: Long)
+
+    @Query("DELETE FROM records WHERE date = :date")
+    suspend fun deleteRecordsByDate(date: String)
+
+    @Query("SELECT * FROM records WHERE date = :date ORDER BY timestamp DESC")
+    suspend fun getRecordsByDate(date: String): List<RecordEntity>
 }

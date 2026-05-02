@@ -24,10 +24,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FlightTakeoff
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Button
@@ -36,6 +39,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -56,11 +60,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luleme.ui.components.BackfillSheet
 import com.luleme.ui.components.CuteCard
 import com.luleme.ui.theme.CuteOrange
 import com.luleme.ui.theme.CutePink
 import com.luleme.ui.theme.CuteYellow
 import com.luleme.ui.theme.SecondaryLight
+import com.luleme.util.formatTimestampToTime
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -73,6 +79,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
+    var showBackfillSheet by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -102,17 +110,33 @@ fun HomeScreen(
             is HomeUiState.Success -> {
                 HomeContent(
                     state = state,
-                    onRecordClick = { viewModel.recordToday() }
+                    onRecordClick = { viewModel.recordToday() },
+                    onDeleteRecord = { id ->
+                        scope.launch { viewModel.deleteRecord(id) }
+                    },
+                    onBackfillClick = { showBackfillSheet = true }
                 )
             }
         }
+    }
+
+    if (showBackfillSheet) {
+        BackfillSheet(
+            onDismiss = { showBackfillSheet = false },
+            onConfirm = { date, count -> viewModel.backfillRecord(date, count) },
+            onDeleteRecord = { id -> viewModel.deleteRecord(id) },
+            onDeleteAllByDate = { date -> viewModel.deleteRecordsByDate(date) },
+            onGetRecordsByDate = { date -> viewModel.getRecordsByDate(date) }
+        )
     }
 }
 
 @Composable
 fun HomeContent(
     state: HomeUiState.Success,
-    onRecordClick: () -> Unit
+    onRecordClick: () -> Unit,
+    onDeleteRecord: (Long) -> Unit,
+    onBackfillClick: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -128,6 +152,25 @@ fun HomeContent(
         item {
             Box(modifier = Modifier.padding(horizontal = 20.dp)) {
                 TodayStatusCard(todayCount = state.todayRecords.size)
+            }
+        }
+
+        // 3. Today Records List
+        if (state.todayRecords.isNotEmpty()) {
+            item {
+                Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    TodayRecordsSection(
+                        records = state.todayRecords,
+                        onDeleteRecord = onDeleteRecord,
+                        onBackfillClick = onBackfillClick
+                    )
+                }
+            }
+        } else {
+            item {
+                Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    EmptyRecordsSection(onBackfillClick = onBackfillClick)
+                }
             }
         }
 
@@ -341,6 +384,171 @@ fun getGreetingMessage(): String {
         in 11..12 -> "中午好！机长"
         in 13..17 -> "下午好！机长"
         else -> "晚上好！机长"
+    }
+}
+
+@Composable
+fun TodayRecordsSection(
+    records: List<com.luleme.domain.model.Record>,
+    onDeleteRecord: (Long) -> Unit,
+    onBackfillClick: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "今日记录",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+            Surface(
+                onClick = onBackfillClick,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "补打卡",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        records.forEach { record ->
+            RecordItem(
+                record = record,
+                onDelete = { onDeleteRecord(record.id) }
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+    }
+}
+
+@Composable
+fun RecordItem(
+    record: com.luleme.domain.model.Record,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = formatTimestampToTime(record.timestamp),
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.SemiBold
+                )
+            )
+            if (record.note != null) {
+                Text(
+                    text = record.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Surface(
+            onClick = onDelete,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = "删除",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyRecordsSection(onBackfillClick: () -> Unit) {
+    CuteCard(
+        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "今日还没起飞",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+                Text(
+                    text = "点击下方按钮或补打卡",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            Surface(
+                onClick = onBackfillClick,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "补打卡",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+            }
+        }
     }
 }
 
